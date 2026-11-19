@@ -1,10 +1,14 @@
 package com.example.service
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -17,39 +21,104 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.service.ui.theme.ComposeTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private val timerSeconds = MutableStateFlow(0)
+    private var isBound = false
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as TimerForegroundService.LocalBinder
+            val myService = binder.getService()
+            isBound = true
+
+            lifecycleScope.launch {
+                myService.getTimerFlow().collect { seconds ->
+                    timerSeconds.value = seconds
+                }
+            }
+        }
+
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            isBound = false
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ComposeTheme {
+                val seconds by timerSeconds.collectAsState()
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TimerScreen(
+                        seconds = seconds,
+                        onStartTimer = {
+                            val intent = Intent(this, TimerForegroundService::class.java)
+                            ContextCompat.startForegroundService(this, intent)
+                            if (!isBound) {
+                                bindService(intent, connection, BIND_AUTO_CREATE)
+                            }
+                        },
+                        onStopTimer = {
+                            val intent = Intent(this, TimerForegroundService::class.java)
+                            stopService(intent)
+                            if (isBound) {
+                                unbindService(connection)
+                                isBound = false
+                            }
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        val intent = Intent(this, TimerForegroundService::class.java)
+        bindService(intent, connection, BIND_AUTO_CREATE)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (isBound) {
+            unbindService(connection)
+            isBound = false
+        }
+    }
 }
 
 @Composable
-fun TimerScreen(modifier: Modifier = Modifier) {
+fun TimerScreen(
+    seconds: Int,
+    onStartTimer: () -> Unit = {},
+    onStopTimer: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
 
-    // Request notification permission for Android 13+ (API 33+)
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) {}
@@ -72,10 +141,17 @@ fun TimerScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            text = "$seconds сек",
+            style = MaterialTheme.typography.displayLarge,
+            fontSize = 48.sp
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         Button(
             onClick = {
-                val intent = Intent(context, TimerForegroundService::class.java)
-                ContextCompat.startForegroundService(context, intent)
+                onStartTimer()
             }
         ) {
             Text(text = "Старт Таймер")
@@ -85,8 +161,7 @@ fun TimerScreen(modifier: Modifier = Modifier) {
 
         Button(
             onClick = {
-                val intent = Intent(context, TimerForegroundService::class.java)
-                context.stopService(intent)
+                onStopTimer()
             }
         ) {
             Text(text = "Стоп Таймер")
@@ -94,11 +169,10 @@ fun TimerScreen(modifier: Modifier = Modifier) {
     }
 }
 
-
 @Preview(showBackground = true)
 @Composable
 fun TimerScreenPreview() {
     ComposeTheme {
-        TimerScreen()
+        TimerScreen(seconds = 14)
     }
 }

@@ -5,23 +5,37 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TimerForegroundService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var seconds = 0
+    private val _timerSeconds = MutableStateFlow(0)
+    private var timerJob: Job? = null
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    private val binder = LocalBinder()
+
+    inner class LocalBinder : Binder() {
+        fun getService(): TimerForegroundService = this@TimerForegroundService
+    }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    fun getTimerFlow(): StateFlow<Int> = _timerSeconds.asStateFlow()
 
     override fun onCreate() {
         super.onCreate()
@@ -39,16 +53,20 @@ class TimerForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        timerJob?.cancel()
         scope.cancel()
+        _timerSeconds.value = 0
         Log.d("Timer", "Таймер зупинено")
     }
 
     private fun startTimer() {
-        scope.launch {
-            while (true) {
-                delay(1000)
-                seconds++
-                Log.d("Timer", "Минуло $seconds секунд")
+        if (timerJob == null || timerJob?.isCompleted == true) {
+            timerJob = scope.launch {
+                while (true) {
+                    delay(1000)
+                    _timerSeconds.value++
+                    Log.d("Timer", "Минуло ${_timerSeconds.value} секунд")
+                }
             }
         }
     }
