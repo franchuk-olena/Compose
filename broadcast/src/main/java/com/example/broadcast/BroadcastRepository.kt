@@ -21,6 +21,7 @@ data class BroadcastEvent(
     val details: String
 )
 
+
 // 2. Репозиторій із callbackFlow
 class BroadcastRepository(private val context: Context) {
 

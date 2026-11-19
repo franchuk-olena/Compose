@@ -33,6 +33,7 @@ class BroadcastViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+
     fun clearAll() {
         _events.value = emptyList()
     }

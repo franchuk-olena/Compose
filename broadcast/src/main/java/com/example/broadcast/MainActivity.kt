@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.example.broadcast.ui.theme.ComposeTheme
 
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: BroadcastViewModel by viewModels()
