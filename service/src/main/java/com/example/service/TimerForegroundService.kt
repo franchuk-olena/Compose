@@ -58,7 +58,7 @@ class TimerForegroundService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Таймер у фоні",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -70,6 +70,7 @@ class TimerForegroundService : Service() {
             .setContentTitle("Фоновий секундомір")
             .setContentText("Таймер відраховує час у фоновому режимі")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setOngoing(true)
             .build()
     }

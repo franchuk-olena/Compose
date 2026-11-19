@@ -94,6 +94,7 @@ fun TimerScreen(modifier: Modifier = Modifier) {
     }
 }
 
+
 @Preview(showBackground = true)
 @Composable
 fun TimerScreenPreview() {
