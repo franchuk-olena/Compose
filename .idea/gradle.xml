@@ -10,6 +10,13 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/boundservice" />
+            <option value="$PROJECT_DIR$/broadcast" />
+            <option value="$PROJECT_DIR$/broadcastflow" />
+            <option value="$PROJECT_DIR$/clickcounter" />
+            <option value="$PROJECT_DIR$/lazylists" />
+            <option value="$PROJECT_DIR$/service" />
+            <option value="$PROJECT_DIR$/workmanager" />
           </set>
         </option>
       </GradleProjectSettings>
