@@ -2,11 +2,12 @@ package com.example.workmanager
 
 import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,31 +15,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.work.Constraints
-import androidx.work.ExistingWorkPolicy
+import androidx.work.Data
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.work.Data
 import com.example.workmanager.ui.theme.ComposeTheme
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,8 +51,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ComposeTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    DataSyncScreen(
-                        context = this,
+                    NewsSyncScreen(
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -57,187 +60,142 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun sync(
-    context: Context,
-    requiresWiFi: Boolean = false,
-    requiresCharging: Boolean = false
-) {
-    val constraintsBuilder = Constraints.Builder().apply {
-        if (requiresWiFi)
-            setRequiredNetworkType(NetworkType.UNMETERED) // Тільки на Wi-Fi (безлімітний трафік)
-
-        if (requiresCharging){
-            setRequiresCharging(true)
-        }
-    }
-    val constraints = constraintsBuilder.build()
-
-    val inputData = Data.Builder()
-        .putString("server_url", "https://api.example.com/sync")
-        .putBoolean("something", true)
+fun triggerOneTimeSync(context: Context): UUID {
+    val constraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
 
-    val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
-        .setConstraints(constraints) // Додаємо умови
+    val inputData = Data.Builder()
+        .putString("user_token", "abc123")
+        .build()
+
+    val request = OneTimeWorkRequestBuilder<NewsSyncWorker>()
+        .setConstraints(constraints)
         .setInputData(inputData)
         .build()
 
-    // 3. Ставимо задачу у системну чергу WorkManager
-    // Використовуємо enqueueUniqueWork, щоб не створити кілька однакових задач
-    WorkManager.getInstance(context).enqueueUniqueWork(
-        "SyncWork",
-        ExistingWorkPolicy.REPLACE,
-        syncRequest
+    WorkManager.getInstance(context).enqueue(request)
+    return request.id
+}
+
+fun enableNightSync(context: Context) {
+    val constraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.UNMETERED)
+        .setRequiresCharging(true)
+        .build()
+
+    val periodicRequest = PeriodicWorkRequestBuilder<NewsSyncWorker>(15, TimeUnit.MINUTES)
+        .setConstraints(constraints)
+        .setInputData(Data.Builder().putString("user_token", "abc123_night").build())
+        .build()
+
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        "night_news_sync",
+        ExistingPeriodicWorkPolicy.KEEP,
+        periodicRequest
     )
+
+    Toast.makeText(context, "Нічну синхронізацію увімкнено!", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
-fun DataSyncScreen(
-    context: Context,
-    modifier: Modifier = Modifier,
-) {
+fun NewsSyncScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val workManager = remember { WorkManager.getInstance(context) }
-    val workInfos by workManager.getWorkInfosForUniqueWorkLiveData("SyncWork").observeAsState(initial = emptyList())
-    val currentWorkInfo = workInfos.firstOrNull()
 
-    // Стан для Constraints (Умов виконання)
-    var requiresWiFi by remember { mutableStateOf(false) }
-    var requiresCharging by remember { mutableStateOf(false) }
+    var currentRequestId by remember { mutableStateOf<UUID?>(null) }
 
-    // Динамічний статус замість статичного
-    val syncStatus = when (currentWorkInfo?.state) {
+    val workInfoState = currentRequestId?.let { id ->
+        workManager.getWorkInfoByIdLiveData(id).observeAsState()
+    }
+    val currentWorkInfo = workInfoState?.value
+
+    val statusText = when (currentWorkInfo?.state) {
         WorkInfo.State.ENQUEUED -> "Очікує виконання..."
-        WorkInfo.State.RUNNING -> "Виконується"
-        WorkInfo.State.SUCCEEDED -> "Готово!"
-        WorkInfo.State.FAILED -> "Помилка синхронізації"
-        WorkInfo.State.BLOCKED -> "Заблоковано іншою роботою"
+        WorkInfo.State.RUNNING -> "Виконується завантаження новин..."
+        WorkInfo.State.SUCCEEDED -> {
+            currentWorkInfo.outputData.getString("result") ?: "Успішно завантажено"
+        }
+        WorkInfo.State.FAILED -> "Помилка завантаження новин"
+        WorkInfo.State.BLOCKED -> "Заблоковано умовою (немає мережі)"
         WorkInfo.State.CANCELLED -> "Синхронізацію скасовано"
         null -> "Очікує запуску..."
     }
-
-    // Отримуємо прогрес з WorkInfo
-    val progressInt = currentWorkInfo?.progress?.getInt("synchronized", 0) ?: 0
-    val progressFloat = progressInt / 100f
-
-    // Чи працює або очікує задача
-    val isRunningOrEnqueued = currentWorkInfo?.state == WorkInfo.State.RUNNING ||
-            currentWorkInfo?.state == WorkInfo.State.ENQUEUED
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "☁️ Резервне копіювання",
+            text = "📰 Новинний Центр",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Картка з налаштуваннями Constraints
         Card(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Умови виконання (Constraints):",
+                    text = "Статус одноразової синхронізації:",
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = requiresWiFi,
-                        onCheckedChange = { requiresWiFi = it }
-                    )
-                    Text("Тільки через Wi-Fi (UNMETERED)")
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = requiresCharging,
-                        onCheckedChange = { requiresCharging = it }
-                    )
-                    Text("Тільки на зарядці (CHARGING)")
-                }
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Статус воркера
-        Text(
-            text = "Статус синхронізації:",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = syncStatus,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Симуляція прогресу (буде відображатися, коли статус "RUNNING")
-        if (currentWorkInfo?.state == WorkInfo.State.RUNNING) {
-            LinearProgressIndicator(
-                progress = { progressFloat },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "$progressInt%")
-        } else {
-            Spacer(modifier = Modifier.height(16.dp)) // Заглушка, щоб висота не стрибала
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Кнопка для запуску
         Button(
             onClick = {
-                sync(context, requiresWiFi, requiresCharging)
+                currentRequestId = triggerOneTimeSync(context)
             },
-            enabled = !isRunningOrEnqueued,
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
-            Text(if (isRunningOrEnqueued) "Працює..." else "Почати бекап")
+            Text("Синхронізувати зараз")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Кнопка для скасування
         Button(
-            onClick = {
-                workManager.cancelUniqueWork("SyncWork")
-            },
-            enabled = isRunningOrEnqueued,
-            modifier = Modifier.fillMaxWidth()
+            onClick = { enableNightSync(context) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
-            Text("Скасувати")
+            Text("Увімкнути нічну синхронізацію")
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun DataSyncScreenPreview() {
+fun NewsSyncScreenPreview() {
     ComposeTheme {
-        DataSyncScreen(context = LocalContext.current)
+        NewsSyncScreen()
     }
 }
