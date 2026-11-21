@@ -32,3 +32,9 @@ include(":service")
 include(":boundservice")
 include(":workmanager")
 include(":sharedpref")
+include(":waterreminderworker")
+include(":private24")
+
+
+include(":cryptoexchange")
+include(":cryptoexchangeproject")

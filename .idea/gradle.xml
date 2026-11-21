@@ -6,6 +6,7 @@
       <GradleProjectSettings>
         <option name="testRunner" value="CHOOSE_PER_TEST" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="gradleJvm" value="jbr-25" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
@@ -14,11 +15,16 @@
             <option value="$PROJECT_DIR$/broadcast" />
             <option value="$PROJECT_DIR$/broadcastflow" />
             <option value="$PROJECT_DIR$/clickcounter" />
+            <option value="$PROJECT_DIR$/cryptoexchange" />
             <option value="$PROJECT_DIR$/lazylists" />
+            <option value="$PROJECT_DIR$/private24" />
             <option value="$PROJECT_DIR$/service" />
+            <option value="$PROJECT_DIR$/sharedpref" />
+            <option value="$PROJECT_DIR$/waterreminderworker" />
             <option value="$PROJECT_DIR$/workmanager" />
           </set>
         </option>
+        <option name="resolveExternalAnnotations" value="false" />
       </GradleProjectSettings>
     </option>
   </component>
