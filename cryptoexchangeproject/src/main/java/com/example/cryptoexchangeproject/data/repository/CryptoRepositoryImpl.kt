@@ -23,7 +23,11 @@ class CryptoRepositoryImpl(
     override suspend fun syncCryptoData(): Result<Unit> {
         return try {
             val rawApiKey = BuildConfig.COINDESK_API_KEY
-            val authHeader = if (rawApiKey.startsWith("Apikey ")) rawApiKey else "Apikey $rawApiKey"
+            val authHeader = when {
+                rawApiKey.isBlank() || rawApiKey == "YOUR_API_KEY" -> null
+                rawApiKey.startsWith("Apikey ") -> rawApiKey
+                else -> "Apikey $rawApiKey"
+            }
 
             val response = api.getTopList(apiKey = authHeader)
             val dtoList = response.data?.list
