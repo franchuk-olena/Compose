@@ -1,13 +1,11 @@
 package com.example.cryptoexchangeproject.presentation.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.cryptoexchangeproject.domain.usecase.GetCryptoListUseCase
 import com.example.cryptoexchangeproject.domain.usecase.SyncCryptoUseCase
 import com.example.cryptoexchangeproject.presentation.model.CryptoUiState
-import com.example.cryptoexchangeproject.worker.WorkManagerScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,10 +62,8 @@ class CryptoViewModel(
         }
     }
 
-    fun refreshData(context: Context) {
+    fun refreshData() {
         _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
-        WorkManagerScheduler.triggerManualSync(context)
-
         viewModelScope.launch {
             val result = syncCryptoUseCase()
             _uiState.update { currentState ->
