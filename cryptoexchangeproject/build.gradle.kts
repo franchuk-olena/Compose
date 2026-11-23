@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Retrofit & Gson (Мережа)
     implementation(libs.retrofit)
@@ -72,7 +73,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     // WorkManager (Фонова синхронізація)
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Coil 3 (Завантаження логотипів)
     val coilVersion = "3.1.0"
