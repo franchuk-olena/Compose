@@ -3,16 +3,16 @@ package com.example.cryptoexchangeproject.data.remote.dto
 import com.google.gson.annotations.SerializedName
 
 data class CryptoDto(
-    @SerializedName("ID")
+    @SerializedName("id")
     val id: String?,
-    @SerializedName("NAME")
+    @SerializedName("name")
     val name: String?,
-    @SerializedName("SYMBOL")
+    @SerializedName("symbol")
     val symbol: String?,
-    @SerializedName("LOGO_URL")
+    @SerializedName("image")
     val logoUrl: String?,
-    @SerializedName("PRICE_USD")
+    @SerializedName("current_price")
     val priceUsd: Double?,
-    @SerializedName("PRICE")
-    val price: Double?
+    @SerializedName("market_cap_rank")
+    val rank: Int?
 )
