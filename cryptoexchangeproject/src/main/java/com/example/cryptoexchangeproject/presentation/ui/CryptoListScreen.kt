@@ -24,14 +24,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cryptoexchangeproject.presentation.viewmodel.CryptoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,8 +39,7 @@ fun CryptoListScreen(
     viewModel: CryptoViewModel,
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
@@ -60,7 +58,7 @@ fun CryptoListScreen(
                 title = { Text("Біржа криптовалют (Top 30)") },
                 actions = {
                     IconButton(
-                        onClick = { viewModel.refreshData(context) },
+                        onClick = { viewModel.refreshData() },
                         enabled = !uiState.isRefreshing
                     ) {
                         if (uiState.isRefreshing) {
