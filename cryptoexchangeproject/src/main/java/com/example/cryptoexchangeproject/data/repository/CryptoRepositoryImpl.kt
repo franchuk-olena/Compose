@@ -23,16 +23,13 @@ class CryptoRepositoryImpl(
     override suspend fun syncCryptoData(): Result<Unit> {
         return try {
             val rawApiKey = BuildConfig.COINDESK_API_KEY
-            val authHeader = when {
-                rawApiKey.isBlank() || rawApiKey == "YOUR_API_KEY" -> null
-                rawApiKey.startsWith("Apikey ") -> rawApiKey
-                else -> "Apikey $rawApiKey"
-            }
+            val apiKeyHeader: String? = if (rawApiKey.isNotBlank() && rawApiKey != "YOUR_API_KEY") {
+                rawApiKey
+            } else null
 
-            val response = api.getTopList(apiKey = authHeader)
-            val dtoList = response.data?.list
+            val dtoList = api.getTopList(apiKey = apiKeyHeader)
 
-            if (dtoList.isNullOrEmpty()) {
+            if (dtoList.isEmpty()) {
                 return Result.failure(IllegalStateException("Порожня відповідь від API"))
             }
 
@@ -40,13 +37,13 @@ class CryptoRepositoryImpl(
             val entities = dtoList.take(30).mapIndexedNotNull { index, dto ->
                 val id = dto.id ?: dto.symbol ?: return@mapIndexedNotNull null
                 val name = dto.name ?: "Unknown"
-                val symbol = dto.symbol ?: ""
+                val symbol = dto.symbol?.uppercase() ?: ""
                 val logoUrl = dto.logoUrl ?: ""
-                val price = dto.priceUsd ?: dto.price
+                val price = dto.priceUsd
 
                 CryptoEntity(
                     id = id,
-                    rank = index + 1,
+                    rank = dto.rank ?: (index + 1),
                     name = name,
                     symbol = symbol,
                     logoUrl = logoUrl,
